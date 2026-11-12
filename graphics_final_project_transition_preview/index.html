@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>UNM CS 412/512 HW5</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ======================================================= -->
+  <!-- PRIMARY HTML PAGE                                       -->
+  <!-- ======================================================= -->
+  
+  <!-- justify-content: center; /* Centers horizontally */
+  align-items: center;     /* Centers vertically */
+  height: 100vh;     -->
+  <div style="display: flex; justify-content: center; align-items: center;">
+    <h1>Space Duck Hunt: The Birdening</h1>
+  </div>
+
+  <div style="display: flex; justify-content: center; align-items: center;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <canvas id="glcanvas" width="1200" height="600"></canvas>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- JAVASCRIPT IMPORTS                                      -->
+  <!-- ======================================================= -->
+
+
+  <!-- ======================================================= -->
+  <!-- CUSTOM SCRIPTS                                          -->
+  <!-- ======================================================= -->
+  
+  <!-- keep track of pressed/unpressed/general tracking in a dict -->
+  <!-- passed to scene on render call. we can customize what's held -->
+  <!-- here as needed. -->
+  <script>
+    // adding some basic defaults at first, will dynamically add 
+    // as more things keydown/keyup.
+    const frontend_data = {
+      "w": false,
+      "a": false,
+      "s": false,
+      "d": false
+    };
+
+    // example: keys.w = true on pressing
+    window.addEventListener('keydown', (event) => {
+      frontend_data[event.key] = true;
+    });
+
+    // example: keys.w = false on not pressing
+    window.addEventListener('keyup', (event) => {
+      frontend_data[event.key] = false;
+    });
+    
+  </script>
+
+
+  <!-- ======================================================= -->
+  <!-- MAIN RENDER LOOP                                        -->
+  <!-- ======================================================= -->
+
+  <script type="module">
+    import { Renderer } from "./util/scene_graph.js";
+    import { SceneTransition } from "./util/scene_transition.js"; // TRANSITION PREVIEW
+
+    // WebGL context setup
+    const canvas = document.getElementById("glcanvas");
+    const gl = canvas.getContext("webgl2");
+    if (!gl) alert("WebGL2 not supported");
+        const aspect = canvas.width / canvas.height;
+
+    let curr_scene = null; // the current scene to be rendered.
+    let next_scene = null; // next scene up in the queue to be rendered.
+
+    // go ahead and grab any assets from any scene's needed here.
+    import * as OuterSpaceBuilder from "../outer_world/outer_space_scene.js";
+    import * as EarthBuilder from "../planetary_duck_hunt/earth_scene.js";
+
+    // create an earth and space scene to start
+    const space = new OuterSpaceBuilder.OuterSpaceScene();
+    const earth = new EarthBuilder.EarthScene();
+
+     /**
+     * rendering manager is a lightweight, simple
+     * iteration to (1) update all nodes' transformation matrices
+     * and (2) coordinate the correct shader for the node.
+     * this is intended to be incredibly simple and should stay so.
+     * any scene given to render(scene) should *just work*.
+     */ 
+    const renderer = new Renderer(gl);
+    
+    // going to set this as the default one being used for the moment:
+    // (but uncomment and switch as needed, please be aware when pushing to main about this)
+    curr_scene = space; // TRANSITION PREVIEW: start in space (was earth)
+    next_scene = earth; // TRANSITION PREVIEW (was space)
+    // TRANSITION PREVIEW: ?scene=earth jumps straight to the bird scene (default is space).
+    if (new URLSearchParams(location.search).get("scene") === "earth") { curr_scene = earth; next_scene = space; }
+
+    // for potential transition testing.
+    // curr_scene = space;
+    // next_scene = earth; 
+
+    curr_scene.init(renderer, aspect); // initialize the scene.
+
+    // TRANSITION PREVIEW: owns the E/click -> Earth landing and Q -> space return.
+    // the other scene is init()ed lazily, once, behind its own `initialized` flag.
+    const transition = new SceneTransition({
+      canvas, renderer, aspect, space, earth,
+      start: curr_scene === earth ? "earth" : "space"
+    });
+    
+    // SHIP PREVIEW: debug handle for the console / automated checks (transition.ship is the Spaceship).
+    window.SHIP_PREVIEW = { transition, space, earth };
+
+    let start_time = null;
+    let delta_time;
+
+    /**
+     * render the scene.
+     */
+    function render(timestep) {
+      if (!start_time) { start_time = timestep; }
+      delta_time = (timestep - start_time) / 1000 // dt in seconds from front end
+      frontend_data.delta_time = delta_time; // make sure this is passed to the scenes, likely will be needed.
+      
+      // TODO: this could be a potential simple transition between scenes. 
+      // note that the curr_scene.initialized is there primarily for the space 
+      // scene: it's very likely we don't want to re-call that for that scene.
+      // a thought, but not required.
+
+      // if (curr_scene.is_over) { // some sort of switch to next flag set by game logic.
+      //   // transition outer -> planet or planet -> outer scenes
+      //   // goes here somehow some way.
+      //   curr_scene = next_scene;
+      //   next_scene = ???;
+      //   if (!curr_scene.initialized) {
+      //     curr_scene.init(renderer, aspect);
+      //   } // end if
+      // } // end if
+
+      transition.render(frontend_data); // TRANSITION PREVIEW: was curr_scene.render(frontend_data);
+      requestAnimationFrame(render);
+    } // end render
+
+    // Initialize when page loads
+    window.onload = function () {
+      requestAnimationFrame(render);
+    }
+
+  </script>
+
+</body>
+
+</html>
